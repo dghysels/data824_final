@@ -7,7 +7,7 @@ library(forcats)
 library(scales)
 
 #dfall<- read.csv("./project/selected_county_health_data2022.csv")
-dfall<- read.csv("../selected_county_health_data2022.csv")
+dfall<- read.csv("./selected_county_health_data2022.csv")
 
 
 shinyServer(function(input, output) {
