@@ -38,7 +38,10 @@ shinyUI(
             )
         ),
         tabPanel("US Population Health",
-           fluidRow(
+            fluidRow(
+                plotOutput("healthHeatmap")
+            ),
+            fluidRow(
              checkboxInput("popHealthZeroScale", "Start Scale at zero (truthful view)", TRUE),
            ),    
            fluidRow(
@@ -60,16 +63,7 @@ shinyUI(
            )
         ),
         tabPanel("Health Behaviors",
-           fluidRow(
-             sliderInput("smoking_topn",
-                         "Number of counties to display:",
-                         min = 5,
-                         max=80,
-                         value = 7)
-           ),
-           fluidRow(
-             plotOutput("smokingbarchart")
-           ),
+
           fluidRow(
             radioButtons("smokeOption", "Adult Smoking / Health Correlation:",
                          c("Poor Health" = "1",
@@ -77,6 +71,19 @@ shinyUI(
           ),
           fluidRow(
               plotOutput("smokeHealthCorr")
+          ),
+          fluidRow(
+            sliderInput("smoking_topn",
+                        "Number of counties to display:",
+                        min = 5,
+                        max=80,
+                        value = 7)
+          ),
+          fluidRow(
+            plotOutput("smokingbarchart")
+          ),
+          fluidRow(
+            plotOutput("healthBehaviors")
           )
 
         ),

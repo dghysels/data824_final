@@ -7,8 +7,8 @@ library(forcats)
 library(scales)
 
 #dfall<- read.csv("./project/selected_county_health_data2022.csv")
-dfall<- read.csv("./selected_county_health_data2022.csv")
-
+#dfall<- read.csv("../selected_county_health_data2022.csv")
+dfall <- read.csv("https://raw.githubusercontent.com/dghysels/data824_final/main/selected_county_health_data2022.csv")
 
 shinyServer(function(input, output) {
   
@@ -70,6 +70,22 @@ shinyServer(function(input, output) {
    })
    
 #----- POPULATION HEALTH -------------
+   
+   output$healthHeatmap <- renderPlot({
+     
+     library(pheatmap)
+     df_hm <- df %>% group_by(State.Abbreviation) %>% summarise(Premature.death = mean(Premature.death),
+                                                                Life.expectancy = mean(Life.expectancy),
+                                                                Child.mortality = mean(Child.mortality),
+                                                                Poor.or.fair.health = mean(Poor.or.fair.health))
+     
+     df_hm <- as.data.frame(df_hm)
+     rownames(df_hm) <-df_hm$State.Abbreviation
+     
+     df_hm <- scale(df_hm[,2:5])
+     pheatmap(t(df_hm), cuttree_cols=4)
+     
+   })
    
    output$lifeExpectancy <- renderPlot({
      
@@ -202,10 +218,47 @@ shinyServer(function(input, output) {
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
 #---- HEALTH BEHAVIORS ---------
+   
+   output$healthBehaviors <- renderPlot({
+     
+     df_hb <- dfall %>% filter(State.Abbreviation == input$state)
+     
+     df_hb %>% 
+       arrange(desc(Name )) %>%
+       slice_tail(n=input$smoking_topn) %>%
+       select(Name,
+              Adult.smoking,
+              Adult.obesity,
+              Physical.inactivity,
+              Excessive.drinking) %>%
+       tidyr::pivot_longer(-Name, names_to = "behavior", values_to = "value") %>% # to long format
+       group_by(behavior) %>% 
+       mutate(`max val` = max(value)) %>%
+       ungroup() %>%
+       mutate(`val scaled` = value / `max val`) %>%
+       ggplot(aes(x = behavior, 
+                  y = `val scaled`,
+                  group = Name, 
+                  color = Name)) +
+       geom_line() + 
+       ylim(-0.1,1.1) +
+       xlab("Health Behavior for State") + 
+       ylab("Scaled Value for Behavior") + 
+       ggtitle("Health Behaviors") + 
+       theme(legend.position="bottom",
+             axis.text.x = element_text(angle=70, hjust = 1, vjust = 1, size = 6),
+             axis.title = element_text(size = 8),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+     
+   },height=800)
+   
    output$smokeHealthCorr <- renderPlot({
      df <- dfall %>% filter(State.Abbreviation == input$state)
      
      if (input$smokeOption == 1){
+       max_smoke_corr_y <- max(df$Poor.or.fair.health)
        g <- df %>% 
          mutate(`Poor or Fair Health` = Poor.or.fair.health ) %>%
          ggplot(aes(x=Adult.smoking , 
@@ -213,6 +266,7 @@ shinyServer(function(input, output) {
              
      }
      else if (input$smokeOption == 2){
+       max_smoke_corr_y <- max(df$Premature.death)
        g <- df %>% 
          mutate(`Premature Death - Years Lost per 100K Pop` = Premature.death ) %>%
          ggplot(aes(x=Adult.smoking , 
@@ -223,6 +277,7 @@ shinyServer(function(input, output) {
        scale_fill_gradient(low="green",high="darkblue") +
        scale_x_continuous() +
        scale_y_continuous() +
+       ylim(-0.1,max_smoke_corr_y) + 
        xlab("Adult Smoking (Percent of Population)") + 
        ggtitle("Adult Smoking vs Health Effects (All Counties for state)") + 
        theme(axis.text = element_text(size = 12),
@@ -238,10 +293,11 @@ shinyServer(function(input, output) {
      df <- dfall %>% filter(State.Abbreviation == input$state)
      
      df %>%
-       arrange(desc(Population )) %>%
+       arrange(desc(Name )) %>%
        slice_tail(n=input$smoking_topn) %>%
        ggplot(aes(x = Name, y=Adult.smoking )) + 
-       geom_bar(aes(x=fct_reorder(Name, Adult.smoking ), binwidth=0.8, y=Adult.smoking ),stat = "identity", position = "stack") + 
+       geom_bar(stat = "identity", position = "stack")+
+       #geom_bar(aes(x=fct_reorder(Name, Adult.smoking ), binwidth=0.8, y=Adult.smoking ),stat = "identity", position = "stack") + 
        ylab("Adult Smoking") + 
        xlab("County") + 
        ggtitle("Adult Smoking by County") + 
