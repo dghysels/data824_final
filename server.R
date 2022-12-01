@@ -5,8 +5,8 @@ library(dplyr)
 library(ggplot2)
 library(forcats)
 library(scales)
+library(pheatmap)
 
-#dfall<- read.csv("./project/selected_county_health_data2022.csv")
 #dfall<- read.csv("../selected_county_health_data2022.csv")
 dfall <- read.csv("https://raw.githubusercontent.com/dghysels/data824_final/main/selected_county_health_data2022.csv")
 
@@ -18,9 +18,9 @@ shinyServer(function(input, output) {
 
    output$popByCounty <- renderPlot({
       
-      df <- dfall %>% filter(State.Abbreviation == input$state)
+      df_pop <- dfall %>% filter(State.Abbreviation == input$state)
       
-      df %>%
+      df_pop %>%
         arrange(desc(Population )) %>%
         slice_tail(n=input$topn) %>%
         ggplot(aes(x = Name, y=Population )) + 
@@ -46,9 +46,9 @@ shinyServer(function(input, output) {
    
    output$ruralByCounty <- renderPlot({
 
-     df <- dfall %>% filter(State.Abbreviation == input$state)
+     df_rural <- dfall %>% filter(State.Abbreviation == input$state)
      
-     df %>%
+     df_rural %>%
        arrange(Rural ) %>%
        slice_tail(n=input$topn) %>%
        ggplot(aes(x = Name, y=Rural)) + 
@@ -73,11 +73,12 @@ shinyServer(function(input, output) {
    
    output$healthHeatmap <- renderPlot({
      
-     library(pheatmap)
-     df_hm <- df %>% group_by(State.Abbreviation) %>% summarise(Premature.death = mean(Premature.death),
-                                                                Life.expectancy = mean(Life.expectancy),
-                                                                Child.mortality = mean(Child.mortality),
-                                                                Poor.or.fair.health = mean(Poor.or.fair.health))
+     df_hm <- dfall %>% 
+       group_by(State.Abbreviation) %>% 
+       summarise(`Premature death` = mean(Premature.death),
+                `Life Expectancy` = mean(Life.expectancy),
+                `Child Mortality` = mean(Child.mortality),
+                `Poor Or Fair Health` = mean(Poor.or.fair.health))
      
      df_hm <- as.data.frame(df_hm)
      rownames(df_hm) <-df_hm$State.Abbreviation
@@ -255,19 +256,19 @@ shinyServer(function(input, output) {
    },height=800)
    
    output$smokeHealthCorr <- renderPlot({
-     df <- dfall %>% filter(State.Abbreviation == input$state)
+     df_sm_corr <- dfall %>% filter(State.Abbreviation == input$state)
      
      if (input$smokeOption == 1){
-       max_smoke_corr_y <- max(df$Poor.or.fair.health)
-       g <- df %>% 
+       max_smoke_corr_y <- max(df_sm_corr$Poor.or.fair.health)
+       g <- df_sm_corr %>% 
          mutate(`Poor or Fair Health` = Poor.or.fair.health ) %>%
          ggplot(aes(x=Adult.smoking , 
                     y=`Poor or Fair Health`))  
              
      }
      else if (input$smokeOption == 2){
-       max_smoke_corr_y <- max(df$Premature.death)
-       g <- df %>% 
+       max_smoke_corr_y <- max(df_sm_corr$Premature.death)
+       g <- df_sm_corr %>% 
          mutate(`Premature Death - Years Lost per 100K Pop` = Premature.death ) %>%
          ggplot(aes(x=Adult.smoking , 
                     y=`Premature Death - Years Lost per 100K Pop`))  
