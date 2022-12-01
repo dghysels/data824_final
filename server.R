@@ -247,8 +247,9 @@ shinyServer(function(input, output) {
        ylab("Scaled Value for Behavior") + 
        ggtitle("Health Behaviors") + 
        theme(legend.position="bottom",
-             axis.text.x = element_text(angle=70, hjust = 1, vjust = 1, size = 6),
-             axis.title = element_text(size = 8),
+             axis.text.x = element_text(angle=70, hjust = 1, vjust = 1, size = 12),
+             axis.text.y = element_text(size = 12),
+             axis.title = element_text(size = 12),
              plot.title = element_text(size = 16, face = "bold"),
              panel.background = element_rect(fill = 'white'),
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
@@ -403,8 +404,8 @@ shinyServer(function(input, output) {
         g_access_dist  + 
         ylab("Count") + 
         ggtitle("Distribution of Healthcare Access Factors") + 
-        theme(axis.text.y = element_text(size = 8),
-              axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+        theme(axis.text.y = element_text(size = 12),
+              axis.text.x = element_text(angle=75,size = 12, vjust = 1, hjust = 1),
               axis.title = element_text(size = 12),
               plot.title = element_text(size = 16, face = "bold"),
               panel.background = element_rect(fill = 'white'),
