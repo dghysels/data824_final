@@ -548,6 +548,12 @@ shinyServer(function(input, output) {
      
      econ_df <- dfall %>% filter(State.Abbreviation == input$state)
      
+     #The plot is too cluttered for the legend when more than 80 counties are displayed
+     legend_loc <- theme(legend.position="bottom")
+     if (input$econ_topn > 80){
+       legend_loc <- theme(legend.position="none")
+     }
+     
      econ_df %>%
        select(Name,
               Poor.or.fair.health,
@@ -576,11 +582,12 @@ shinyServer(function(input, output) {
        ylab("Scaled Value for Economic Factors") + 
        ggtitle("Scaled Economic Factors by County") + 
        theme(axis.text.x = element_text(angle=70,hjust = 1, vjust=1, size = 12),
-             legend.position="bottom",
+             
              axis.title = element_text(size = 16),
              plot.title = element_text(size = 16, face = "bold"),
              panel.background = element_rect(fill = 'white'),
-             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))+ 
+     legend_loc
      
    },height=800)
    
