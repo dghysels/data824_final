@@ -1,0 +1,936 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+https://www.countyhealthrankings.org/sites/default/files/media/document/2022%20Analytic%20Documentation.pdf
+
+https://www.countyhealthrankings.org/explore-health-rankings/rankings-data-documentation
+
+https://www.countyhealthrankings.org/sites/default/files/media/document/DataDictionary_2022.pdf
+
+https://www.countyhealthrankings.org/sites/default/files/media/document/2022%20County%20Health%20Rankings%20Data%20-%20v1.xlsx
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+#suppports reordering factors for plots
+library(forcats)
+```
+
+Import the 2022 data downloaded from County Health Analytics
+
+```{r}
+raw_df<- read.csv("../../county_health_analytic_data2022.csv")
+
+#load a list of states and state abbreviations.  These will be 
+#used in the shiny UI to allow for selection of a state
+names_df<- read.csv("./state_name_abbr.csv")
+states <- list()
+for (i in 1:nrow(names_df)){
+  r <-paste(names_df[i,1],"=",names_df[i,2], sep = "")
+  states <- append(states,r)
+}
+
+regions <- read.csv("us_regions.csv")
+colnames(regions) <- c("State","State.Abbreviation","Region","Division")
+
+raw_df <- raw_df %>% inner_join(regions, by="State.Abbreviation")
+
+#unlist(states)
+#find all the .raw columns.  A list of variables to explore will be chosen from this list
+cols <- data.frame(colnames(raw_df)) %>% filter(str_detect(colnames.raw_df.,".raw"))
+  
+```
+
+Select the columns to work with for this analysis.
+
+```{r}
+raw_df <- raw_df %>% 
+  filter(County.FIPS.Code != 0) %>%
+  select(Name, 
+         Region,
+         State.Abbreviation, 
+         County.FIPS.Code, 
+         Population.raw.value, 
+         Premature.death.raw.value, #5***
+         Life.expectancy.raw.value, #6 ***
+         Child.mortality.raw.value, #7***
+         Poor.or.fair.health.raw.value, 
+         #economics
+         Unemployment.raw.value, 
+         #Children.in.poverty.raw.value, 
+         Income.inequality.raw.value, 
+         Median.household.income.raw.value, 
+         Homeownership.raw.value, 
+         Food.insecurity.raw.value, 
+         Severe.housing.problems.raw.value, 
+         #education
+         School.funding.adequacy.raw.value,  
+         High.school.completion.raw.value,  
+         Reading.scores.raw.value, 
+         #Broadband.access.raw.value, 
+         Children.eligible.for.free.or.reduced.price.lunch.raw.value, 
+         #behaviors
+         Adult.smoking.raw.value,  
+         Excessive.drinking.raw.value, 
+         Physical.inactivity.raw.value, 
+         Adult.obesity.raw.value, 
+         #Teen.births.raw.value,  
+         Uninsured.raw.value, 
+         Uninsured.children.raw.value, 
+         Primary.care.physicians.raw.value, 
+         X..not.proficient.in.English.raw.value, 
+         X..rural.raw.value 
+         )
+
+selected_cols <- colnames(raw_df)
+
+```
+
+Find all the variables with missing values and output a table to understand the impact
+
+```{r}
+missing_val <- data.frame()
+
+for (i in 1:length(selected_cols)){
+  missing <- raw_df[is.na(raw_df[,i]), c("State.Abbreviation","Name")] 
+  if (nrow(missing > 0)){
+     missing['column_name'] <- selected_cols[i]
+     missing_val <- rbind(missing_val, missing)
+  }
+}
+
+missing_val %>% group_by(column_name) %>% 
+  summarise(`missing count`=n(), 100*(percent=n()/nrow(raw_df))) %>% 
+  arrange(desc(`missing count`))
+```
+
+Plot of missing values.  Variables have been renamed to improve readability
+
+```{r fig.height=8}
+  missing_val %>% 
+  #filter(!column_name %in% c("X..rural.raw.value","Income.inequality.raw.value","Median.household.income.raw.value")) %>%
+  mutate(column_name = case_when(column_name == 'Life.expectancy.raw.value'~'Life Expectancy',
+                                                 column_name == 'Premature.death.raw.value'~'Premature Death',
+                                                 column_name == 'Child.mortality.raw.value'~'Child Mortality',
+                                                 column_name == 'Income.inequality.raw.value'~'Income Inequality',
+                                                 column_name == 'Unemployment.raw.value'~'Unemployment',
+                                                 column_name == 'Median.household.income.raw.value'~'Median Income',
+                                                 column_name == 'School.funding.adequacy.raw.value'~'School Funding Adequacy',
+                                                 column_name == 'Reading.scores.raw.value'~'Reading Scores',
+                                                 column_name == 'Children.eligible.for.free.or.reduced.price.lunch.raw.value'~
+                                                   'Free/Reduced Lunch',
+                                                 column_name == 'Uninsured.raw.value'~'Uninsured',
+                                                 column_name == 'Uninsured.children.raw.value'~'Uninsured Children',
+                                                 column_name == 'Primary.care.physicians.raw.value' ~ 'Primary Care Physicians',
+                                                 column_name == 'X..rural.raw.value' ~ 'Rural'))  %>%
+    ggplot(aes(x=fct_infreq(column_name), fill=State.Abbreviation) ) + 
+    geom_bar( stat = "count",show.legend = FALSE) + 
+    ggtitle("Summary of Missing Values (color by state)") + 
+    xlab("Variable") + 
+    ylab("Missing Count") + 
+    ylim(c(-5,1300)) +
+    theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 12, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+            # panel.grid.major = element_line(color = 'light grey', size = .5, linetype = 'solid'),
+            # panel.grid.minor = element_line(color = 'white'),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+
+```
+
+Missing values must be replaced.  Use MICE to replace missing values wherever possible.  This method was possible for all but 3 variables
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(mice)
+#this link was very helpful 
+#https://datascienceplus.com/imputing-missing-data-with-r-mice-package/
+imputed <- mice(raw_df[,8:ncol(raw_df)], m=5, method="pmm", seed=3)
+
+#imputed$imp
+
+imputed_df <- complete(imputed,1)
+
+df <- cbind(raw_df[,1:7],imputed_df)
+```
+
+Replace missing values for variables that fail using MICE due to singularity errors
+* Premature Death
+* Life Expectancy
+* Child Mortality
+
+```{r}
+df <- df %>% 
+  mutate(Premature.death.raw.value
+         = replace(Premature.death.raw.value,
+                   is.na(Premature.death.raw.value),
+                   median(Premature.death.raw.value, na.rm = TRUE)))
+
+df <- df %>% 
+  mutate(Life.expectancy.raw.value
+         = replace(Life.expectancy.raw.value,
+                   is.na(Life.expectancy.raw.value),
+                   median(Life.expectancy.raw.value, na.rm = TRUE)))
+
+df <- df %>% 
+  mutate(Child.mortality.raw.value
+         = replace(Child.mortality.raw.value,
+                   is.na(Child.mortality.raw.value),
+                   median(Child.mortality.raw.value, na.rm = TRUE)))
+```
+
+Rename variables to shorten by removing the .raw.value appended to all variables.  
+
+Multiply fractions by 100 (or 100,000) to get percentages.  
+
+```{r}
+
+         #Premature.death.raw.value, #5***
+         #Life.expectancy.raw.value, 
+         #Child.mortality.raw.value, 
+         #Primary.care.physicians.raw.value
+         df <- df %>% 
+                rename(Population= Population.raw.value) %>%
+                rename(Life.expectancy = Life.expectancy.raw.value) %>%
+                rename(Premature.death = Premature.death.raw.value) %>%
+                rename(Primary.care.physicians = Primary.care.physicians.raw.value) %>%
+                rename(Child.mortality = Child.mortality.raw.value) %>%
+                rename(Poor.or.fair.health = Poor.or.fair.health.raw.value) %>%
+                rename(Unemployment = Unemployment.raw.value) %>%
+                rename(Income.inequality = Income.inequality.raw.value) %>%
+                rename(Median.income = Median.household.income.raw.value) %>%
+                rename(Homeownership = Homeownership.raw.value) %>%
+                rename(Food.insecurity = Food.insecurity.raw.value) %>%
+                rename(Severe.housing.problems = Severe.housing.problems.raw.value) %>%
+                rename(Reading.scores = Reading.scores.raw.value) %>%
+                rename(School.funding.adequacy = School.funding.adequacy.raw.value) %>%
+                rename(High.school.completion = High.school.completion.raw.value) %>%
+                rename(Free.or.reduced.lunch.eligibility = 
+                         Children.eligible.for.free.or.reduced.price.lunch.raw.value) %>%
+                rename(Adult.smoking = Adult.smoking.raw.value) %>%
+                rename(Excessive.drinking = Excessive.drinking.raw.value) %>%
+                rename(Physical.inactivity = Physical.inactivity.raw.value) %>%
+                rename(Adult.obesity = Adult.obesity.raw.value) %>%
+                rename(Uninsured = Uninsured.raw.value) %>%
+                rename(Uninsured.children = Uninsured.children.raw.value) %>%
+                rename(Not.proficient.in.English = X..not.proficient.in.English.raw.value) %>%
+                rename(Rural = X..rural.raw.value) %>%
+                mutate(Child.mortality = Child.mortality  * 100000) %>%
+                mutate(Poor.or.fair.health  = Poor.or.fair.health  * 100) %>%
+                mutate(Unemployment  = Unemployment  * 100) %>%
+                #mutate(Income.inequality  = Income.inequality  * 100) %>%
+                mutate(Homeownership  = Homeownership  * 100) %>%
+                mutate(Food.insecurity  = Food.insecurity  * 100) %>%
+                mutate(Severe.housing.problems  = Severe.housing.problems  * 100) %>%
+                mutate(School.funding.adequacy  = School.funding.adequacy  * 100) %>%
+                mutate(High.school.completion  = High.school.completion  * 100) %>%
+                mutate(Free.or.reduced.lunch.eligibility  = 
+                         Free.or.reduced.lunch.eligibility  * 100) %>%
+                mutate(Adult.smoking  = Adult.smoking  * 100) %>%
+                mutate(Excessive.drinking  = Excessive.drinking  * 100) %>%
+                mutate(Physical.inactivity  = Physical.inactivity  * 100) %>%
+                mutate(Adult.obesity  = Adult.obesity  * 100) %>%
+                mutate(Uninsured  = Uninsured  * 100) %>%
+                mutate(Uninsured.children  = Uninsured.children  * 100) %>%
+                mutate(Not.proficient.in.English  = Not.proficient.in.English  * 100) %>%
+                mutate(Rural  = Rural  * 100)
+```
+
+The following is a list of all attributes available for analysis:
+* Population
+* Life.expectancy
+* Premature.death
+* Primary.care.physicians
+* Child.mortality
+* Poor.or.fair.health
+* Unemployment
+* Income.inequality
+* Median.income
+* Homeownership
+* Food.insecurity
+* Severe.housing.problems
+* Reading.scores
+* School.funding.adequacy
+* High.school.completion
+* Free.or.reduced.lunch.eligibility 
+* Adult.smoking
+* Excessive.drinking
+* Physical.inactivity
+* Adult.obesity
+* Uninsured
+* Uninsured.children
+* Not.proficient.in.English
+* Rural
+
+Write the modified data to a CSV for use by the Shiny App!!
+
+```{r}
+write.csv(df, "./selected_county_health_data2022.csv")
+df_st <- df %>% filter(State.Abbreviation == "KS")
+```
+find the maximum number of counties
+```{r}
+df %>% group_by(State.Abbreviation) %>% count() %>% arrange(desc(n))
+```
+
+
+Examing correlations for all variables using PCA
+
+```{r}
+library(FactoMineR)
+library(factoextra)
+
+
+res.PCA<-PCA(df_st[,5:28],graph=FALSE)
+fviz_eig(res.PCA)
+fviz_pca_ind(res.PCA,repel=TRUE)
+fviz_pca_biplot(res.PCA,repel=TRUE)
+```
+
+
+
+```{r}
+df_st %>% ggplot(aes(Primary.care.physicians )) +
+  geom_histogram( bins = 100,fill='blue') + 
+  ylab("Count") + 
+      xlab("Physician Ratio") + 
+      ggtitle("Distribution of Primary Care Physician ratio to population") + 
+      theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+            # panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+            # panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+```
+
+```{r fig.height=12}
+library(corrplot)
+df.cor <- cor(df[4:ncol(df)], method="spearman")
+corrplot(df.cor, method="number", )
+```
+
+```{r}
+df %>% 
+  ggplot(aes(y=Adult.smoking ,
+                  x=Rural )) +
+      geom_point(bins=50) + 
+      geom_smooth(method = "lm",level=0.90) +
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Percent Smoking") + 
+      xlab("Percent Rural") + 
+      ggtitle("Correlation with smoking:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Adult.smoking  ~ Rural ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+```
+
+
+
+```{r}
+df %>% 
+  ggplot(aes(y=Poor.or.fair.health ,
+                  x=Adult.smoking )) +
+      geom_point(bins=50) + 
+      geom_smooth(method = "lm",level=0.90) +
+      scale_x_continuous() +
+      scale_y_continuous() +
+      xlab("Percent Smoking") + 
+      ylab("Poor or Fair Health") + 
+      ggtitle("Poor or Fair Health Correlation with smoking") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Poor.or.fair.health  ~ Adult.smoking ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+```
+
+Explore the correlations between healthcare access and  health
+
+```{r fig.height=12}
+library(corrplot)
+access_df <- df %>% select(Primary.care.physicians, 
+                           Uninsured, 
+                           Uninsured.children,
+                           Poor.or.fair.health,
+                           Life.expectancy,
+                           Premature.death,
+                           Child.mortality)
+df.cor.health <- cor(access_df, method="spearman")
+corrplot(df.cor.health, method="number", )
+```
+
+
+
+```{r fig.height=8}
+
+
+df %>% 
+  filter(State.Abbreviation == "MI") %>%
+  select(Name,
+         Adult.smoking,
+         Adult.obesity,
+         Physical.inactivity,
+         Excessive.drinking) %>%
+  arrange(desc(Name)) %>%
+  tidyr::pivot_longer(-Name, names_to = "behavior", values_to = "value") %>% # to long format
+  group_by(behavior) %>% 
+  mutate(`max val` = max(value)) %>%
+  ungroup() %>%
+  mutate(`val scaled` = value / `max val`) %>%
+  ggplot(aes(x = behavior, 
+             y = `val scaled`,
+             group = Name, 
+             color = Name)) +
+  geom_line() + 
+      xlab("Health Behavior for State") + 
+      ylab("Scaled Value for Behavior") + 
+      ggtitle("Health Behaviors") + 
+      theme(legend.position="bottom",
+            axis.text.x = element_text(angle=70, hjust = 1, vjust = 1, size = 6),
+             axis.title = element_text(size = 8),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+```
+
+
+```{r}
+library(scales)
+df_st %>%
+  arrange(Population ) %>%
+  top_n(5,Population ) %>%
+  ggplot(aes(x = Name, y=Population )) + 
+      geom_bar(aes(x=fct_reorder(Name, Population ), y=Population ),stat = "identity", position = "stack") + 
+      ylab("Population") + 
+      xlab("County") + 
+      ggtitle("State Population by County") + 
+      scale_y_continuous(labels = label_comma()) + 
+      theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+```
+
+
+```{r}
+library(scales)
+df_st %>%
+  select(Population, Rural, Name) %>%
+  arrange(Population) %>%
+  slice_head(n=50) %>%
+  ggplot(aes(x = Name, y=Rural)) + 
+      geom_bar(aes(x=fct_reorder(Name, Population), y=Rural),stat = "identity", position = "stack") + 
+      ylab("Percent Rural") + 
+      xlab("County") + 
+      ggtitle("State Population in Rural Areas by County") + 
+      scale_y_continuous(labels = label_comma()) + 
+      theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+```
+
+
+```{r fig.height=8}
+
+  df_st %>%
+  select(Name,
+      Poor.or.fair.health,
+      Income.inequality,
+      Food.insecurity,
+      Severe.housing.problems,
+      Unemployment) %>%
+       arrange(desc(Name )) %>%
+       slice_tail(n=20) %>%
+       tidyr::pivot_longer(-Name, names_to = "Economic Factor", values_to = "value") %>% # to long format
+       group_by(`Economic Factor`) %>%
+       mutate(`max value` = max(value)) %>% # max value calculation
+       mutate(`Relative value` = value / `max value`) %>%
+      # mutate(`min value` = min(value), 
+      #        `Value modif` = value - `min value`,
+      #        `max value modif` = max(`Value modif`), 
+      #        `Relative value modif` = `Value modif` / `max value modif`) %>%  
+       ungroup() %>%
+       ggplot(aes(x = `Economic Factor`, 
+                  y = `Relative value`,
+                  group = Name, 
+                  color = Name)) +
+       geom_line(linewidth=0.4) + 
+       ylim(-0.1,1.1) +
+       xlab("Economic Factor") + 
+       ylab("Scaled Value for Economic Factors") + 
+       ggtitle("Economic Factors by County") + 
+       theme(axis.text.x = element_text(angle=70,hjust = 1, vjust=1, size = 6),
+             legend.position="bottom",
+             axis.title = element_text(size = 8),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             #panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             #panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+```
+
+```{r}
+library(pheatmap)
+df_hm <- df %>% group_by(State.Abbreviation) %>% summarise(Premature.death = mean(Premature.death),
+                                                                   Life.expectancy = mean(Life.expectancy),
+                                                                    Child.mortality = mean(Child.mortality),
+                                                                    Poor.or.fair.health = mean(Poor.or.fair.health))
+
+df_hm <- as.data.frame(df_hm)
+rownames(df_hm) <-df_hm$State.Abbreviation
+
+df_hm <- scale(df_hm[,2:5])
+pheatmap(t(df_hm), cuttree_cols=4)
+```
+
+
+```{r}
+
+max_life = max(df$Life.expectancy )
+min_life = 0 #min(df$Life.expectancy )
+
+df %>% 
+  select(State.Abbreviation, Life.expectancy ) %>%
+  group_by(State.Abbreviation) %>%
+  summarise(`Avg Life Expectancy` = mean(Life.expectancy ),
+            `Max Life Expectancy` = max(Life.expectancy ),
+            `Min Life Expectancy` = min(Life.expectancy )) %>%
+  arrange(`Avg Life Expectancy`) %>%
+  ggplot() + 
+      geom_point(aes(x=fct_reorder(State.Abbreviation,`Avg Life Expectancy`), y=`Avg Life Expectancy`, color='Average'), size=3) +
+      geom_point(aes(x=State.Abbreviation, y=`Min Life Expectancy`, color="Minimum"), size=3) + 
+      geom_point(aes(x=State.Abbreviation, y=`Max Life Expectancy`, color="Maximum"), size=3) + 
+      scale_color_manual(name="Life Expectancy", values=c('Average'='blue', 'Minimum'='red', 'Maximum'='green')) +
+      ylab("Life Expectancy (Years)") + 
+      xlab("State") + 
+      ylim(min_life,max_life) + 
+      ggtitle("Life Expectancy by State") + 
+      theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+```
+
+
+```{r}
+
+     g1 <- df_st %>% 
+              mutate(`Poor or Fair Health` = Poor.or.fair.health ) %>%
+              ggplot(aes(x=Adult.smoking , 
+                       y=`Poor or Fair Health`))  
+           
+
+     g2 <- df_st %>% 
+            mutate(`Premature Death - years lost per 100,000` = Premature.death ) %>%
+            ggplot(aes(x=Adult.smoking , 
+                            y=`Premature Death - years lost per 100,000`))  
+     
+     g1 + geom_bin2d(bins=20) + 
+       scale_fill_gradient(low="green",high="darkblue") +
+      scale_x_continuous() +
+      scale_y_continuous() +
+      xlab("Adult Smoking") + 
+      ggtitle("Adult Smoking vs Health Effects") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+```
+
+
+```{r}
+
+df_st %>%
+  ggplot(aes(x = Name, y=Adult.smoking )) + 
+      geom_point(aes(x=fct_reorder(Name, Adult.smoking ), binwidth=0.8, y=Adult.smoking )) + #,stat = "identity", position = "stack") + 
+      ylab("Adult Smoking") + 
+      xlab("County") + 
+      ggtitle("Adult Smoking by County") + 
+      theme(axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+```
+
+
+```{r}
+        g1 <- df_st %>% 
+        mutate(`Uninsured` = Uninsured ) %>%
+        ggplot(aes(y=Poor.or.fair.health ,
+                  x=`Uninsured`))
+        
+        g2 <- df_st %>% 
+        mutate(`Uninsured Children` = Uninsured.children ) %>%
+        ggplot(aes(y=Poor.or.fair.health ,
+                  x=`Uninsured Children`))
+
+        g3 <- df_st %>% 
+        mutate(`Population Ratio to Primary Care Physicians` = Primary.care.physicians ) %>%
+        ggplot(aes(y=Poor.or.fair.health ,
+                  x=`Population Ratio to Primary Care Physicians`))
+   
+        g3 +
+        geom_point()+
+        geom_density2d_filled(alpha=0.5, bins=10) +
+        ylab("Poor or Fair Health") + 
+        ggtitle("Access to Healthcare") + 
+        theme(axis.text = element_text(size = 12),
+              axis.title = element_text(size = 12),
+              plot.title = element_text(size = 16, face = "bold"),
+              panel.background = element_rect(fill = 'white'),
+              panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+              panel.grid.minor = element_line(color = 'light blue', size = .5),
+              panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+df %>% 
+  ggplot(aes(y=Poor.or.fair.health ,
+                  x=School.funding.adequacy )) +
+      geom_bin_2d(bins=50) + 
+      geom_smooth(method = "lm",level=0.90) +
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Poor or Fair Health") + 
+      xlab("School Funding Adequacy") + 
+      ggtitle("National: Poor Health vs School Funding:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Poor.or.fair.health  ~ School.funding.adequacy ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+
+```
+
+```{r message=FALSE, warning=FALSE}
+df %>% filter(State.Abbreviation == "MI") %>%
+  ggplot(aes(y=Reading.scores ,
+                  x=Food.insecurity ,
+                  color=High.school.completion )) +
+      geom_point() + 
+      geom_smooth(method = "lm",level=0.90) + 
+      scale_x_log10() +
+      scale_y_continuous() +
+      ylab("Reading Scores") + 
+      xlab("Food Insecurity") + 
+      ggtitle("Michigan: Reading Scores vs Food Insecurity:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Reading.scores  ~ Food.insecurity ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+```
+
+```{r message=FALSE, warning=FALSE}
+
+
+max(df$Reading.scores , rm.na=FALSE)
+
+df %>% filter(State.Abbreviation == "MS") %>%
+  arrange(Reading.scores ) %>%
+  select(Name,Reading.scores , Food.insecurity ) %>%
+  mutate(max_score = max(Reading.scores , rm.na=TRUE)) %>%
+  mutate(max_food = max(Food.insecurity , rm.na=TRUE)) %>%
+  mutate(Reading.scores  = Reading.scores  / max_score) %>%
+  mutate(Food.insecurity  = Food.insecurity  / max_food) %>%
+  mutate(Reading.scores  = Reading.scores  - .5) %>%
+  ggplot() +
+      geom_point(aes(x=fct_reorder(Name, Reading.scores ), y=Reading.scores , color='reading scores')) + 
+      geom_point(aes(x=Name, y=Food.insecurity , color='food insecurity')) + 
+      ylab("Standardized Reading and food insecurity") + 
+      xlab("Standardized Food Insecurity") + 
+      ylim(0,1.1) +
+      ggtitle("State of Missouri Reading Scores and Food Insecurity") + 
+      scale_color_manual(name="legend", values=c('food insecurity'='red', 'reading scores'='green')) +
+      theme(legend.position="bottom",
+             axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 6, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'light grey', size=0.25, linetype = 'solid'),
+             #panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+    
+sm <- summary(lm(data=df, formula = Reading.scores  ~ Food.insecurity ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+```
+
+```{r}
+df %>% 
+  filter(State.Abbreviation == "MI") %>% 
+  ggplot(aes(y=Poor.or.fair.health ,
+                  x=High.school.completion ,
+                  color=Life.expectancy )) +
+      geom_point() + 
+      geom_smooth(method = "lm",level=0.90) + 
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Poor or Fair Health") + 
+      xlab("High School Completion") + 
+      ggtitle("Michigan: Poor or Fair Health vs High School Completion:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Poor.or.fair.health  ~ High.school.completion ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+```
+
+```{r message=FALSE, warning=FALSE}
+df_st %>% 
+ggplot(aes(y=Life.expectancy ,
+                  x=High.school.completion ,
+                  color=Poor.or.fair.health )) + 
+      geom_point() + 
+      geom_smooth(method = "lm",level=0.90) + 
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Life Expectancy") + 
+      xlab("High School Completion") + 
+      ggtitle("Michigan: Life Expectancy vs High School Completion:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Life.expectancy  ~ High.school.completion ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+```
+
+```{r message=FALSE, warning=FALSE}
+df_st %>% 
+  ggplot(aes(y=Poor.or.fair.health ,
+                  x=Reading.scores ,
+                  color=Life.expectancy )) +
+      geom_point() + 
+      geom_smooth(method = "lm",level=0.90) + 
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Fair or Poor Health") + 
+      xlab("Reading Scores") + 
+      ggtitle("Kansas: Fair or Poor Health vs Reading Scores:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Poor.or.fair.health  ~ Reading.scores ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+
+```
+
+```{r}
+df %>% 
+  ggplot(aes(y=Adult.obesity ,
+                  x=High.school.completion )) +
+      geom_bin_2d(bins=50) + 
+      geom_smooth(method = "lm",level=0.90) + 
+      scale_x_continuous() +
+      scale_y_continuous() +
+      ylab("Adult Obesity") + 
+      xlab("High School Completion") + 
+      ggtitle("National: Adult Obesity vs High School Completion:") + 
+      theme(axis.text = element_text(size = 12),
+             axis.title = element_text(size = 12),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "black", fill = NA, size = 1.5))
+    
+sm <- summary(lm(data=df, formula = Adult.obesity  ~ High.school.completion ))
+
+print(paste("Adult Obesity ~ High School Completion Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+```
+
+
+```{r}
+
+df %>% 
+  select(State.Abbreviation, Primary.care.physicians , Life.expectancy ) %>%
+  mutate(Primary.care.physicians  = (Primary.care.physicians  / max(Primary.care.physicians))) %>%
+  mutate(Life.expectancy  = Life.expectancy  / max(Life.expectancy)) %>%
+  group_by(State.Abbreviation) %>%
+  summarise(median_PCP = median(Primary.care.physicians), 
+            median_life = median(Life.expectancy),
+            max_phys = max(Primary.care.physicians),
+            max_life = max(Life.expectancy)) %>%
+  ggplot() +
+      geom_point(aes(x=fct_reorder(State.Abbreviation, median_PCP ), y=median_PCP , color='Primary Care Physicians')) + 
+      geom_point(aes(x=State.Abbreviation, y=median_life , color='Life Expectancy')) + 
+      ylab("Standardized") + 
+      xlab("State") + 
+      ggtitle("National: Life Expectancy and Physician availability") + 
+      scale_color_manual(name="legend", values=c('Primary Care Physicians'='red', 'Life Expectancy'='green')) +
+      theme(legend.position="bottom",
+             axis.text.y = element_text(size = 8),
+             axis.text.x = element_text(angle=75,size = 6, vjust = 1, hjust = 1),
+             axis.title = element_text(size = 12),
+             panel.grid.major = element_line(color = 'light grey', size=0.5, linetype = 'solid'),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+    
+sm <- summary(lm(data=df, formula = Poor.or.fair.health  ~ Primary.care.physicians ))
+
+print(paste("Regression R^2",sm$r.squared,sep="="))
+print(paste(c("Regression Slope","Std Error","t value","p value"),sm$coefficients[2,],sep="="))
+```
+
+
+```{r fig.height=8}
+
+
+df %>% 
+  group_by(State.Abbreviation) %>%
+  summarise(`Adult Smoking` = median(Adult.smoking ),
+            `Adult Obesity` = median(Adult.obesity ),
+            `Physical Inactivity` = median(Physical.inactivity ),
+            `Excessive Drinking` = median(Excessive.drinking )) %>%
+  select(State.Abbreviation,
+         `Adult Smoking`,
+         `Adult Obesity`,
+         `Physical Inactivity`,
+         `Excessive Drinking`) %>%
+  arrange(desc(State.Abbreviation)) %>%
+  tidyr::pivot_longer(-State.Abbreviation, names_to = "behavior", values_to = "value") %>% # to long format
+  group_by(behavior) %>% 
+  mutate(`max val` = max(value)) %>%
+  ungroup() %>%
+  mutate(`val scaled` = value / `max val`) %>%
+  ggplot(aes(x = behavior, 
+             y = `val scaled`,
+             group = State.Abbreviation, 
+             color = State.Abbreviation)) +
+  geom_line() + 
+      xlab("Health Behavior") + 
+      ylab("Scaled Value for Behavior") + 
+      ggtitle("Health Behaviors") + 
+      theme(axis.text = element_text(size = 6),
+             axis.title = element_text(size = 8),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             #panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             #panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+```
+
+```{r}
+df %>% 
+  group_by(State.Abbreviation) %>%
+  summarise(`Adult Smoking` = median(Adult.smoking ),
+            `Adult Obesity` = median(Adult.obesity ),
+            `Physical Inactivity` = median(Physical.inactivity ),
+            `Excessive Drinking` = median(Excessive.drinking )) %>%
+  select(State.Abbreviation,
+         `Adult Smoking`,
+         `Adult Obesity`,
+         `Physical Inactivity`,
+         `Excessive Drinking`) %>%
+  arrange(desc(State.Abbreviation)) %>%
+  tidyr::pivot_longer(-State.Abbreviation, names_to = "key", values_to = "val") %>% # to long format
+  group_by(key) %>% # for every key - measure (w/o group will find one max, not 4 max values)
+  mutate(`max val` = max(val)) %>% # calculate max value for cty, cyl, displ, hwy
+  ungroup() %>% #have the max so un-group
+  mutate(`val scaled` = val / `max val`) %>%
+  ggplot(aes(x = key, 
+             y = State.Abbreviation, 
+             fill = `val scaled`)) +
+  geom_tile() + 
+      xlab("High Risk Behavior") + 
+      ylab("State") + 
+      ggtitle("Adult Health Behaviors") + 
+      theme(axis.text = element_text(size = 6),
+             axis.title = element_text(size = 8),
+             plot.title = element_text(size = 16, face = "bold"),
+             panel.background = element_rect(fill = 'white'),
+             #panel.grid.major = element_line(color = 'blue', linetype = 'solid'),
+             #panel.grid.minor = element_line(color = 'light blue', size = .5),
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
+```
+
