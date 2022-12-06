@@ -26,7 +26,7 @@ library(forcats)
 Import the 2022 data downloaded from County Health Analytics
 
 ```{r}
-raw_df<- read.csv("../../county_health_analytic_data2022.csv")
+raw_df<- read.csv("../county_health_analytic_data2022.csv")
 
 #load a list of states and state abbreviations.  These will be 
 #used in the shiny UI to allow for selection of a state
@@ -230,7 +230,7 @@ Multiply fractions by 100 (or 100,000) to get percentages.
                 mutate(Homeownership  = Homeownership  * 100) %>%
                 mutate(Food.insecurity  = Food.insecurity  * 100) %>%
                 mutate(Severe.housing.problems  = Severe.housing.problems  * 100) %>%
-                mutate(School.funding.adequacy  = School.funding.adequacy  * 100) %>%
+                mutate(School.funding.adequacy  = School.funding.adequacy) %>%
                 mutate(High.school.completion  = High.school.completion  * 100) %>%
                 mutate(Free.or.reduced.lunch.eligibility  = 
                          Free.or.reduced.lunch.eligibility  * 100) %>%
