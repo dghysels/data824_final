@@ -10,6 +10,8 @@ library(pheatmap)
 #dfall<- read.csv("../selected_county_health_data2022.csv")
 dfall <- read.csv("https://raw.githubusercontent.com/dghysels/data824_final/main/selected_county_health_data2022.csv")
 
+options(scipen = 100)
+
 shinyServer(function(input, output) {
   
    output$stateout <-renderText(input$state)
@@ -49,12 +51,12 @@ shinyServer(function(input, output) {
      df_rural <- dfall %>% filter(State.Abbreviation == input$state)
      
      df_rural %>%
-       arrange(Rural ) %>%
+       arrange(desc(Population) ) %>%
        slice_tail(n=input$topn) %>%
        ggplot(aes(x = Name, y=Rural)) + 
-       geom_bar(aes(x=fct_reorder(Name, Rural), y=Rural),
+       geom_bar(aes(x=fct_reorder(Name, Population), y=Rural),
                 stat = "identity", position = "stack") + 
-       ylab("Percent Rural") + 
+       ylab("Rural (%)") + 
        xlab("County") + 
        ggtitle("Percent Rural by County") + 
        scale_y_continuous(labels = label_comma()) + 
@@ -70,6 +72,9 @@ shinyServer(function(input, output) {
    })
    
 #----- POPULATION HEALTH -------------
+   output$pophealth_alert <- renderText({
+     "Note: US view is not affected by state selection"
+   })
    
    output$healthHeatmap <- renderPlot({
      
@@ -171,7 +176,7 @@ shinyServer(function(input, output) {
        ggplot() + 
        geom_point(aes(x=fct_reorder(Name,Poor.or.fair.health), y=Poor.or.fair.health, color='Poor Health'), size=3) +
        scale_color_manual(name="Poor/Fair Health", values=c('Poor Health'='blue')) +
-       ylab("Poor/Fair Health") + 
+       ylab("Poor or Fair Health (%)") + 
        xlab("County") + 
        ylim(min_life,max_life) + 
        ggtitle("Poor or Fair Health by County") + 
@@ -262,9 +267,9 @@ shinyServer(function(input, output) {
      if (input$smokeOption == 1){
        max_smoke_corr_y <- max(df_sm_corr$Poor.or.fair.health)
        g <- df_sm_corr %>% 
-         mutate(`Poor or Fair Health` = Poor.or.fair.health ) %>%
+         mutate(`Poor or Fair Health Percent` = Poor.or.fair.health ) %>%
          ggplot(aes(x=Adult.smoking , 
-                    y=`Poor or Fair Health`))  
+                    y=`Poor or Fair Health Percent`))  
              
      }
      else if (input$smokeOption == 2){
@@ -300,7 +305,7 @@ shinyServer(function(input, output) {
        ggplot(aes(x = Name, y=Adult.smoking )) + 
        geom_bar(stat = "identity", position = "stack")+
        #geom_bar(aes(x=fct_reorder(Name, Adult.smoking ), binwidth=0.8, y=Adult.smoking ),stat = "identity", position = "stack") + 
-       ylab("Adult Smoking") + 
+       ylab("Adult Smoking (%)") + 
        xlab("County") + 
        ggtitle("Adult Smoking by County") + 
        theme(axis.text.y = element_text(size = 8),
@@ -347,7 +352,7 @@ shinyServer(function(input, output) {
       g +
         geom_point()+
         geom_density2d_filled(alpha=0.5, bins=10) +
-        ylab("Poor or Fair Health") + 
+        ylab("Poor/Fair Health(%)") + 
         ggtitle("Access to Healthcare (select data point for details)") + 
         theme(axis.text = element_text(size = 12),
               axis.title = element_text(size = 12),
@@ -424,7 +429,7 @@ shinyServer(function(input, output) {
                          y=Poor.or.fair.health ,
                          color=Life.expectancy )) + 
          xlab("Reading Scores") +
-         ylab("Poor Health") 
+         ylab("Poor or fair Health (%)") 
         
      }
      else if (input$ed_option == 2){
@@ -432,14 +437,14 @@ shinyServer(function(input, output) {
                          y=Poor.or.fair.health ,
                          color=Life.expectancy )) + 
          xlab("School Funding Adequacy") +
-         ylab("Poor Health") 
+         ylab("Poor or fair Health (%)") 
      }
      else{
        gg_ed <- df %>% ggplot(aes(x= High.school.completion , 
                          y=Poor.or.fair.health ,
                          color=Life.expectancy )) + 
-         xlab("High School Completion") +
-         ylab("Poor Health")  
+         xlab("High School Completion (%)") +
+         ylab("Poor or fair Health (%)")  
      }
 
 #generate the state education correlation plot
@@ -472,21 +477,21 @@ shinyServer(function(input, output) {
                                   y=Poor.or.fair.health ,
                                   color=Life.expectancy )) + 
                xlab("Reading Scores") +
-               ylab("Poort Health") 
+               ylab("Poor/Fair Health(%)") 
      }
      else if (input$ed_option == 2){
        gg_ed <- dfall %>% ggplot(aes(x= School.funding.adequacy , 
                                   y=Poor.or.fair.health ,
                                   color=Life.expectancy )) + 
          xlab("School Funding Adequacy") +
-         ylab("Poor or Fair Health") 
+         ylab("Poor/Fair Health(%)") 
      }
      else{
        gg_ed <- dfall %>% ggplot(aes(x= High.school.completion , 
                                   y=Poor.or.fair.health ,
                                   color=Life.expectancy )) + 
          xlab("High School Completion") +
-         ylab("Poor or Fair Health") 
+         ylab("Poor/Fair Health(%)") 
      }
 
 #generate the education correlation plot at the national level   

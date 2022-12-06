@@ -26,9 +26,9 @@ shinyUI(
             fluidRow(
                sliderInput("topn",
                           "Number of counties to display:",
-                          min = 5,
-                          max=80,
-                          value = 7)
+                          min = 10,
+                          max=254,
+                          value = 20)
             ),
             fluidRow(
                 plotOutput("popByCounty")
@@ -38,6 +38,13 @@ shinyUI(
             )
         ),
         tabPanel("US Population Health",
+            fluidRow(
+              textOutput("pophealth_alert"),
+              tags$head(tags$style("#pophealth_alert{color: blue;
+                                 font-size: 20px;
+                                 font-style: italic;
+                                 }"))
+            ),
             fluidRow(
                 plotOutput("healthHeatmap")
             ),
@@ -75,9 +82,9 @@ shinyUI(
           fluidRow(
             sliderInput("smoking_topn",
                         "Number of counties to display:",
-                        min = 5,
-                        max=80,
-                        value = 7)
+                        min = 10,
+                        max=254,
+                        value = 20)
           ),
           fluidRow(
             plotOutput("smokingbarchart")
@@ -136,7 +143,7 @@ shinyUI(
                 sliderInput("econ_topn",
                       "Number of counties to display:",
                       min = 10,
-                      max=80,
+                      max=254,
                       value = 20)
            ),
            fluidRow(
