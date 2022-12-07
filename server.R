@@ -18,6 +18,13 @@ shinyServer(function(input, output) {
 
 #---- DEMOGRAPHCICS ----------------     
 
+   #display a message to the user indicating the number of counties
+   output$demo_alert <- renderText({
+     pop_rows <- nrow(dfall %>% filter(State.Abbreviation == input$state))
+     paste(pop_rows, "Counties in the state of ", input$state)
+   })
+   
+   #show population by county ordered from lowest population to highest
    output$popByCounty <- renderPlot({
       
       df_pop <- dfall %>% filter(State.Abbreviation == input$state)
@@ -33,7 +40,7 @@ shinyServer(function(input, output) {
         ylab("Population") + 
         xlab("County") + 
         scale_y_continuous(labels = label_comma()) + 
-        ggtitle("State Population by County") + 
+        ggtitle("State Population by County (ordered by increasing population)") + 
         theme(axis.text.y = element_text(size = 8),
               axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
               axis.title = element_text(size = 12),
@@ -46,6 +53,8 @@ shinyServer(function(input, output) {
       
     })
    
+   #bar graph of percent rural, ordered by increasing population to
+   #match the population bar graph
    output$ruralByCounty <- renderPlot({
 
      df_rural <- dfall %>% filter(State.Abbreviation == input$state)
@@ -58,7 +67,7 @@ shinyServer(function(input, output) {
                 stat = "identity", position = "stack") + 
        ylab("Rural (%)") + 
        xlab("County") + 
-       ggtitle("Percent Rural by County") + 
+       ggtitle("Percent Rural by County (ordered by increasing population)") + 
        scale_y_continuous(labels = label_comma()) + 
        theme(axis.text.y = element_text(size = 8),
              axis.text.x = element_text(angle=75,size = 8, vjust = 1, hjust = 1),
@@ -76,6 +85,7 @@ shinyServer(function(input, output) {
      "Note: US view is not affected by state selection"
    })
    
+   #heatmap of health related behaviours
    output$healthHeatmap <- renderPlot({
      
      df_hm <- dfall %>% 
@@ -128,6 +138,7 @@ shinyServer(function(input, output) {
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
    
+   #plot of life expectancy by county
    output$lifeExpectancyCounty <- renderPlot({
      
      df_life_st <- dfall %>% filter(State.Abbreviation == input$state)
@@ -135,6 +146,8 @@ shinyServer(function(input, output) {
      max_life <- max(df_life_st$Life.expectancy )
      min_life <- min(dfall$Life.expectancy )
      
+     #the user can choose to start the scale ate zero
+     #or 'zoom' in
      if (input$countyHealthZeroScale){
        min_life = 0
      }
@@ -159,6 +172,7 @@ shinyServer(function(input, output) {
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
    
+   #plot poor health by count
    output$PoorHealthCounty <- renderPlot({
      
      df_poor_st <- dfall %>% filter(State.Abbreviation == input$state)
@@ -166,6 +180,8 @@ shinyServer(function(input, output) {
      max_life <- max(df_poor_st$Poor.or.fair.health )
      min_life <- min(df_poor_st$Poor.or.fair.health )
      
+     #the user can choose to start the scale ate zero
+     #or 'zoom' in
      if (input$countyHealthZeroScale){
        min_life = 0
      }
@@ -189,11 +205,13 @@ shinyServer(function(input, output) {
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
    
+   #National plot of poor health by state
    output$PoorHealth <- renderPlot({
 
      max_life <- max(dfall$Poor.or.fair.health )
      min_life <- min(dfall$Poor.or.fair.health )
-     
+  #the user can choose to start the scale ate zero
+  #or 'zoom' in
      if (input$popHealthZeroScale){
        min_life = 0
      }
@@ -223,11 +241,29 @@ shinyServer(function(input, output) {
              #panel.grid.minor = element_line(color = 'light blue', size = .5),
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
-#---- HEALTH BEHAVIORS ---------
    
+#---- HEALTH BEHAVIORS ---------
+   #display a message to the user indicating the number of counties
+   output$behav_alert <- renderText({
+     pop_rows <- nrow(dfall %>% filter(State.Abbreviation == input$state))
+     alert <- paste(pop_rows, "Counties in the state of ", input$state)
+     if (input$smoking_topn > 60){
+       alert <- paste(alert, "Note: More than 60 counties selected, the legend has been dropped")
+     }
+     alert
+   })
+   
+   #render a line plot of health behaviors by county
+   #the user can select the number of counties to display
    output$healthBehaviors <- renderPlot({
      
      df_hb <- dfall %>% filter(State.Abbreviation == input$state)
+     
+     #remove the legend when more than 60 counties are selected for display
+     legend_loc <- theme(legend.position="bottom")
+     if (input$smoking_topn > 60){
+       legend_loc <- theme(legend.position="none")
+     }
      
      df_hb %>% 
        arrange(desc(Name )) %>%
@@ -251,16 +287,18 @@ shinyServer(function(input, output) {
        xlab("Health Behavior for State") + 
        ylab("Scaled Value for Behavior") + 
        ggtitle("Health Behaviors") + 
-       theme(legend.position="bottom",
+       theme(
              axis.text.x = element_text(angle=70, hjust = 1, vjust = 1, size = 12),
              axis.text.y = element_text(size = 12),
              axis.title = element_text(size = 12),
              plot.title = element_text(size = 16, face = "bold"),
              panel.background = element_rect(fill = 'white'),
-             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
-     
-   },height=800)
+             panel.border = element_rect(color = "light grey", fill = NA, size = 0.5)) + 
+             legend_loc
+      
+   },height=600)
    
+   #correlate smoking with poor health
    output$smokeHealthCorr <- renderPlot({
      df_sm_corr <- dfall %>% filter(State.Abbreviation == input$state)
      
@@ -296,6 +334,7 @@ shinyServer(function(input, output) {
              panel.border = element_rect(color = "light grey", fill = NA, size = 0.5))
    })
    
+   #smoking by county
    output$smokingbarchart <- renderPlot({
      df <- dfall %>% filter(State.Abbreviation == input$state)
      
@@ -326,25 +365,25 @@ shinyServer(function(input, output) {
     output$access_density <- renderPlot({
       df_access <- dfall %>% 
         filter(State.Abbreviation == input$state) %>%
-        mutate(`Uninsured` = Uninsured ) %>%
-        mutate(`Uninsured Children` = Uninsured.children ) %>%
-        mutate(`Poor/Fair Health` = Poor.or.fair.health ) %>%
+        mutate(`Percent Uninsured` = Uninsured ) %>%
+        mutate(`Percent Uninsured Children` = Uninsured.children ) %>%
+        mutate(`Percent Poor/Fair Health` = Poor.or.fair.health ) %>%
         mutate(`Ratio Physicians` = Primary.care.physicians )
       
 #select the healthcare access factor to display
       if (input$accessOption == 1){
         g <- df_access %>% 
-          ggplot(aes(y=`Poor/Fair Health`,
-                     x=`Uninsured`))
+          ggplot(aes(y=`Percent Poor/Fair Health`,
+                     x=`Percent Uninsured`))
       }
       else if (input$accessOption == 2) {
         g <- df_access %>% 
-          ggplot(aes(y=`Poor/Fair Health`,
-                     x=`Uninsured Children`))
+          ggplot(aes(y=`Percent Poor/Fair Health`,
+                     x=`Percent Uninsured Children`))
       }
       else if (input$accessOption == 3){
         g <- df_access %>% 
-          ggplot(aes(y=`Poor/Fair Health`,
+          ggplot(aes(y=`Percent Poor/Fair Health`,
                      x=`Ratio Physicians`))
       }
       
@@ -369,14 +408,14 @@ shinyServer(function(input, output) {
     output$hc_data <- renderTable({
       df_hc_near <- dfall %>% 
         filter(State.Abbreviation == input$state) %>%
-        mutate(`Uninsured` = Uninsured ) %>%
-        mutate(`Poor/Fair Health` = Poor.or.fair.health ) %>%
-        mutate(`Uninsured Children` = Uninsured.children ) %>%
+        mutate(`Percent Uninsured` = Uninsured ) %>%
+        mutate(`Percent Poor/Fair Health` = Poor.or.fair.health ) %>%
+        mutate(`Percent Uninsured Children` = Uninsured.children ) %>%
         mutate(`Ratio Physicians` = format(Primary.care.physicians ,nsmall=4)) %>%
         select(Name, 
-               `Poor/Fair Health`,
-               `Uninsured`,
-               `Uninsured Children`,
+               `Percent Poor/Fair Health`,
+               `Percent Uninsured`,
+               `Percent Uninsured Children`,
                `Ratio Physicians`)
       req(input$plot_click)
       print(input$plot_click)
@@ -388,17 +427,17 @@ shinyServer(function(input, output) {
       
       df_access_dist <- dfall %>% 
         filter(State.Abbreviation == input$state) %>%
-        mutate(`Uninsured` = Uninsured ) %>%
-        mutate(`Poor/Fair Health` = Poor.or.fair.health ) %>%
-        mutate(`Uninsured Children` = Uninsured.children ) %>%
+        mutate(`Percent Uninsured` = Uninsured ) %>%
+        mutate(`Percent Poor/Fair Health` = Poor.or.fair.health ) %>%
+        mutate(`Percent Uninsured Children` = Uninsured.children ) %>%
         mutate(`Ratio Physicians` = Primary.care.physicians )
       
       if (input$accessOption == 1){
-        g_access_dist <- df_access_dist %>% ggplot(aes(`Uninsured`)) +
+        g_access_dist <- df_access_dist %>% ggplot(aes(`Percent Uninsured`)) +
           geom_histogram( bins = 100,fill='blue')
       }
       else if (input$accessOption == 2) {
-        g_access_dist <- df_access_dist %>% ggplot(aes(`Uninsured Children`)) +
+        g_access_dist <- df_access_dist %>% ggplot(aes(`Percent Uninsured Children`)) +
           geom_histogram( bins = 100,fill='blue')
       }
       else if (input$accessOption == 3){
@@ -490,7 +529,7 @@ shinyServer(function(input, output) {
        gg_ed <- dfall %>% ggplot(aes(x= High.school.completion , 
                                   y=Poor.or.fair.health ,
                                   color=Life.expectancy )) + 
-         xlab("High School Completion") +
+         xlab("High School Completion (%)") +
          ylab("Poor/Fair Health(%)") 
      }
 
@@ -528,11 +567,11 @@ shinyServer(function(input, output) {
               Severe.housing.problems ,
               Unemployment ) %>%
        rename("County Name"=Name,
-              "Poor/Fair Health"=Poor.or.fair.health ,
+              "Percent Poor/Fair Health"=Poor.or.fair.health ,
               "Income Inequality" = Income.inequality ,
-              "Food Insecurity"=Food.insecurity ,
-              "Housing Problems"=Severe.housing.problems ,
-              "Unemployment"=Unemployment )
+              "Percent Food Insecurity"=Food.insecurity ,
+              "Percent Housing Problems"=Severe.housing.problems ,
+              "Percent Unemployment"=Unemployment )
      
      
        econ_df
@@ -540,8 +579,15 @@ shinyServer(function(input, output) {
    },options = list(pageLength = 10)
    )
    
-   output$EconPlot <- renderPlot({
-     
+   #alert the user when more than 60 counties are selected
+   #display the number of counties in the selected state
+   output$econ_alert <- renderText({
+     pop_rows <- nrow(dfall %>% filter(State.Abbreviation == input$state))
+     alert <- paste(pop_rows, "Counties in the state of ", input$state)
+     if (input$econ_topn > 60){
+       alert <- paste(alert, "Note: More than 60 counties selected, the legend has been dropped")
+     }
+     alert
    })
    
    output$EconomicPlot <- renderPlot({
@@ -550,7 +596,7 @@ shinyServer(function(input, output) {
      
      #The plot is too cluttered for the legend when more than 80 counties are displayed
      legend_loc <- theme(legend.position="bottom")
-     if (input$econ_topn > 80){
+     if (input$econ_topn > 60){
        legend_loc <- theme(legend.position="none")
      }
      

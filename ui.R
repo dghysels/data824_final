@@ -24,6 +24,11 @@ shinyUI(
     navlistPanel(
         tabPanel("Demographics",
             fluidRow(
+               textOutput("demo_alert"),
+               tags$head(tags$style("#demo_alert{color: blue;
+                                 font-size: 16px;
+                                 font-style: bold;
+                                 }")),
                sliderInput("topn",
                           "Number of counties to display:",
                           min = 10,
@@ -80,6 +85,11 @@ shinyUI(
               plotOutput("smokeHealthCorr")
           ),
           fluidRow(
+            textOutput("behav_alert"),
+            tags$head(tags$style("#behav_alert{color: blue;
+                                 font-size: 16px;
+                                 font-style: bold;
+                                 }")),
             sliderInput("smoking_topn",
                         "Number of counties to display:",
                         min = 10,
@@ -140,11 +150,16 @@ shinyUI(
        ),
        tabPanel("Economics Plot",
           fluidRow(
-                sliderInput("econ_topn",
-                      "Number of counties to display:",
-                      min = 10,
-                      max=254,
-                      value = 20)
+              textOutput("econ_alert"),
+              tags$head(tags$style("#econ_alert{color: blue;
+                                 font-size: 16px;
+                                 font-style: bold;
+                                 }")),
+              sliderInput("econ_topn",
+                    "Number of counties to display:",
+                    min = 10,
+                    max=254,
+                    value = 20)
            ),
            fluidRow(
              plotOutput('EconomicPlot')
